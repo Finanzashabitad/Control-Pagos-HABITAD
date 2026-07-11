@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conciliación de Pagos · HABI+TAD</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --navy:#1B2E4B;
+    --navy-light:#2C4368;
+    --cream:#F7F4EE;
+    --paper:#FFFFFF;
+    --gold:#C89B3C;
+    --gold-dark:#A67D28;
+    --green:#2F7B52;
+    --green-bg:#E7F3EC;
+    --red:#B23A2F;
+    --red-bg:#FBEAE8;
+    --gray:#6B7280;
+    --gray-light:#E5E1D8;
+    --ink:#22242A;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .topbar{
+    background:var(--navy);
+    color:#fff;
+    padding:22px 32px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-bottom:4px solid var(--gold);
+  }
+  .topbar .brand{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .topbar .brand h1{
+    font-family:'Libre Baskerville',serif;
+    font-size:22px;
+    margin:0;
+    letter-spacing:0.3px;
+  }
+  .topbar .brand span{
+    font-size:12px;
+    color:var(--gold);
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    font-weight:600;
+  }
+  .topbar .sub{
+    font-size:12px;
+    color:#B9C2D4;
+  }
+
+  .wrap{
+    max-width:880px;
+    margin:0 auto;
+    padding:36px 24px 80px;
+  }
+
+  .steps{
+    display:flex;
+    gap:6px;
+    margin-bottom:28px;
+  }
+  .steps .step{
+    flex:1;
+    text-align:center;
+    padding:10px 6px;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--gray);
+    border-bottom:3px solid var(--gray-light);
+    transition:all .25s ease;
+  }
+  .steps .step.active{
+    color:var(--navy);
+    border-bottom-color:var(--gold);
+  }
+  .steps .step.done{
+    color:var(--green);
+    border-bottom-color:var(--green);
+  }
+
+  .card{
+    background:var(--paper);
+    border-radius:6px;
+    padding:32px;
+    box-shadow:0 1px 3px rgba(27,46,75,0.08), 0 1px 2px rgba(27,46,75,0.06);
+    margin-bottom:24px;
+    border:1px solid var(--gray-light);
+  }
+
+  .card h2{
+    font-family:'Libre Baskerville',serif;
+    font-size:19px;
+    margin:0 0 6px;
+    color:var(--navy);
+  }
+  .card .hint{
+    font-size:13px;
+    color:var(--gray);
+    margin:0 0 22px;
+  }
+
+  .dropzone{
+    border:2px dashed #C7CCD6;
+    border-radius:6px;
+    padding:40px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:all .2s ease;
+    background:#FBFAF7;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--gold);
+    background:#FCF7EC;
+  }
+  .dropzone svg{margin-bottom:10px;}
+  .dropzone p{margin:0;color:var(--gray);font-size:14px;}
+  .dropzone strong{color:var(--navy);}
+  #fileInput{display:none;}
+
+  .fields-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:24px;
+  }
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    color:var(--gray);
+  }
+  .field input, .field select{
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+    border:1px solid var(--gray-light);
+    border-radius:4px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .field input:focus, .field select:focus{
+    outline:none;
+    border-color:var(--gold);
+    box-shadow:0 0 0 3px rgba(200,155,60,0.15);
+  }
+  .field.money input{font-family:'JetBrains Mono',monospace;font-weight:600;}
+
+  .cat-choices{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+  }
+  .cat-btn{
+    padding:22px 14px;
+    border-radius:6px;
+    border:2px solid var(--gray-light);
+    background:#fff;
+    cursor:pointer;
+    text-align:center;
+    transition:all .18s ease;
+    font-family:'Inter',sans-serif;
+  }
+  .cat-btn:hover{border-color:var(--gold);}
+  .cat-btn.selected{
+    border-color:var(--navy);
+    background:var(--navy);
+    color:#fff;
+  }
+  .cat-btn .icon{font-size:26px;display:block;margin-bottom:8px;}
+  .cat-btn .label{font-weight:700;font-size:14px;}
+
+  .search-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .search-row input{
+    flex:1;
+    padding:10px 14px;
+    border:1px solid var(--gray-light);
+    border-radius:4px;
+    font-size:14px;
+  }
+
+  .items-list{
+    border:1px solid var(--gray-light);
+    border-radius:6px;
+    max-height:340px;
+    overflow-y:auto;
+  }
+  .item-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:14px 16px;
+    border-bottom:1px solid var(--gray-light);
+  }
+  .item-row:last-child{border-bottom:none;}
+  .item-row:hover{background:#FBFAF7;}
+  .item-row input[type=checkbox]{
+    width:18px;height:18px;accent-color:var(--navy);cursor:pointer;flex-shrink:0;
+  }
+  .item-row .info{flex:1;min-width:0;}
+  .item-row .info .main{font-weight:600;font-size:14px;color:var(--ink);}
+  .item-row .info .sub{font-size:12px;color:var(--gray);margin-top:2px;}
+  .item-row .val{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:14px;
+    color:var(--navy);
+    white-space:nowrap;
+  }
+  .empty-state{padding:40px 20px;text-align:center;color:var(--gray);font-size:14px;}
+
+  .totals-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:18px;
+    padding:16px 20px;
+    border-radius:6px;
+    background:var(--cream);
+    border:1px solid var(--gray-light);
+  }
+  .totals-bar .lbl{font-size:12px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;}
+  .totals-bar .amt{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px;}
+  .totals-bar.match{background:var(--green-bg);border-color:var(--green);}
+  .totals-bar.match .amt{color:var(--green);}
+  .totals-bar.mismatch{background:var(--red-bg);border-color:var(--red);}
+  .totals-bar.mismatch .amt{color:var(--red);}
+
+  .btn-row{display:flex;justify-content:flex-end;gap:12px;margin-top:24px;}
+  .btn{
+    padding:12px 26px;
+    border-radius:4px;
+    border:none;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-primary:hover{background:var(--navy-light);}
+  .btn-primary:disabled{background:#C7CCD6;cursor:not-allowed;}
+  .btn-ghost{background:transparent;color:var(--gray);border:1px solid var(--gray-light);}
+  .btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
+
+  .ticket{
+    background:var(--navy);
+    color:#fff;
+    border-radius:6px;
+    padding:0;
+    overflow:hidden;
+    position:relative;
+  }
+  .ticket-head{
+    padding:28px 32px 20px;
+    text-align:center;
+  }
+  .ticket-head .check{
+    width:52px;height:52px;
+    border-radius:50%;
+    background:var(--gold);
+    display:flex;align-items:center;justify-content:center;
+    margin:0 auto 14px;
+    font-size:26px;
+  }
+  .ticket-head h2{
+    font-family:'Libre Baskerville',serif;
+    margin:0 0 4px;
+    font-size:20px;
+  }
+  .ticket-head p{margin:0;color:#B9C2D4;font-size:13px;}
+  .tear{
+    height:16px;
+    background:
+      radial-gradient(circle at 10px 0, transparent 8px, var(--navy) 8.5px) repeat-x;
+    background-size:20px 16px;
+    background-position:0 -8px;
+  }
+  .ticket-body{
+    background:var(--paper);
+    color:var(--ink);
+    padding:26px 32px 30px;
+  }
+  .ticket-row{
+    display:flex;justify-content:space-between;
+    padding:9px 0;
+    border-bottom:1px dashed var(--gray-light);
+    font-size:13px;
+  }
+  .ticket-row:last-child{border-bottom:none;}
+  .ticket-row .k{color:var(--gray);}
+  .ticket-row .v{font-weight:600;font-family:'JetBrains Mono',monospace;}
+  .ticket-items{margin:16px 0;}
+  .ticket-items .ti{
+    font-size:13px;padding:6px 0;color:var(--ink);
+    display:flex;justify-content:space-between;
+  }
+
+  .status-msg{
+    text-align:center;padding:14px;border-radius:4px;font-size:13px;font-weight:600;margin-top:16px;
+  }
+  .status-msg.error{background:var(--red-bg);color:var(--red);}
+  .status-msg.loading{background:var(--cream);color:var(--gray);}
+
+  @media(max-width:640px){
+    .fields-grid{grid-template-columns:1fr;}
+    .cat-choices{grid-template-columns:1fr;}
+    .topbar{padding:16px 18px;flex-direction:column;align-items:flex-start;gap:4px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <h1>HABI+TAD</h1>
+    <span>Conciliación de Pagos</span>
+  </div>
+  <div class="sub" id="topbarSub">Fase 1 · Registro de comprobantes</div>
+</div>
+
+<div class="wrap">
+
+  <div class="steps">
+    <div class="step" id="step1Tab">1. Comprobante</div>
+    <div class="step" id="step2Tab">2. Categoría</div>
+    <div class="step" id="step3Tab">3. Asociar pendientes</div>
+    <div class="step" id="step4Tab">4. Confirmación</div>
+  </div>
+
+  <!-- PASO 1: SUBIR PDF -->
+  <div class="card" id="panel1">
+    <h2>Sube el comprobante de pago</h2>
+    <p class="hint">Arrastra el PDF del banco o haz clic para seleccionarlo. Extraemos el valor, la fecha y la referencia automáticamente — podrás corregir cualquier dato antes de continuar.</p>
+
+    <div class="dropzone" id="dropzone">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8A93A6" stroke-width="1.6"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      <p><strong>Haz clic para subir</strong> o arrastra el PDF aquí</p>
+    </div>
+    <input type="file" id="fileInput" accept="application/pdf">
+
+    <div id="extractStatus"></div>
+
+    <div class="fields-grid" id="extractFields" style="display:none;">
+      <div class="field">
+        <label>Fecha del pago</label>
+        <input type="date" id="fFecha">
+      </div>
+      <div class="field money">
+        <label>Valor pagado (COP)</label>
+        <input type="text" id="fValor" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Cuenta origen</label>
+        <input type="text" id="fCuenta" placeholder="Ej. Cta Ahorros BCS 24108367603">
+      </div>
+      <div class="field">
+        <label>N° confirmación</label>
+        <input type="text" id="fConfirmacion" placeholder="Ej. 92345CK4">
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <label>Referencia de pago</label>
+        <input type="text" id="fReferencia" placeholder="Ej. 4701271983">
+      </div>
+    </div>
+
+    <div class="btn-row" id="row1" style="display:none;">
+      <button class="btn btn-primary" id="toStep2">Continuar →</button>
+    </div>
+  </div>
+
+  <!-- PASO 2: CATEGORIA -->
+  <div class="card" id="panel2" style="display:none;">
+    <h2>¿A qué corresponde este pago?</h2>
+    <p class="hint">Elige la categoría para mostrarte solo los pendientes relevantes.</p>
+    <div class="cat-choices">
+      <div class="cat-btn" data-cat="Proveedor">
+        <span class="icon">🧾</span>
+        <span class="label">Proveedor</span>
+      </div>
+      <div class="cat-btn" data-cat="Nomina">
+        <span class="icon">👤</span>
+        <span class="label">Nómina</span>
+      </div>
+      <div class="cat-btn" data-cat="Impuesto">
+        <span class="icon">🏛️</span>
+        <span class="label">Impuestos</span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="back2to1">← Atrás</button>
+      <button class="btn btn-primary" id="toStep3" disabled>Continuar →</button>
+    </div>
+  </div>
+
+  <!-- PASO 3: ASOCIAR PENDIENTES -->
+  <div class="card" id="panel3" style="display:none;">
+    <h2 id="panel3Title">Selecciona los pendientes que cubre este pago</h2>
+    <p class="hint">Marca uno o varios ítems. El total seleccionado se compara automáticamente con el valor del comprobante.</p>
+
+    <div class="search-row">
+      <input type="text" id="searchBox" placeholder="Buscar por nombre, N° factura o período...">
+    </div>
+
+    <div class="items-list" id="itemsList">
+      <div class="empty-state">Cargando pendientes desde Airtable...</div>
+    </div>
+
+    <div class="totals-bar" id="totalsBar">
+      <span class="lbl">Total seleccionado</span>
+      <span class="amt" id="selectedTotal">$0</span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="back3to2">← Atrás</button>
+      <button class="btn btn-primary" id="toStep4" disabled>Registrar pago →</button>
+    </div>
+  </div>
+
+  <!-- PASO 4: CONFIRMACION -->
+  <div class="card ticket" id="panel4" style="display:none;">
+    <div class="ticket-head">
+      <div class="check">✓</div>
+      <h2>Pago registrado</h2>
+      <p>Se actualizó el estado de los pendientes seleccionados</p>
+    </div>
+    <div class="tear"></div>
+    <div class="ticket-body">
+      <div class="ticket-row"><span class="k">Fecha</span><span class="v" id="tFecha"></span></div>
+      <div class="ticket-row"><span class="k">Valor total</span><span class="v" id="tValor"></span></div>
+      <div class="ticket-row"><span class="k">Cuenta origen</span><span class="v" id="tCuenta"></span></div>
+      <div class="ticket-row"><span class="k">Referencia</span><span class="v" id="tReferencia"></span></div>
+      <div class="ticket-row"><span class="k">Categoría</span><span class="v" id="tCategoria"></span></div>
+      <div class="ticket-items" id="tItems"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="newPago" style="width:100%;">Registrar otro pago</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="globalStatus"></div>
+
+</div>
+
+<script>
+/* ============ CONFIGURACIÓN AIRTABLE ============ */
+const AIRTABLE_TOKEN = patOmq9Z6ObFPIWjA.cab1d4f66a155fedc4159a3eaaf88e296d66dc63b5b20c207c630f7770330c86
+;
+const BASE_ID = "appDNWsdsP2toCQdB";
+const API_URL = `https://api.airtable.com/v0/${BASE_ID}`;
+
+const TABLES = {
+  Proveedor: { table: "Facturas", nameField: "Proveedor", refField: "N_Factura", valueField: "Valor_Neto", periodoField: "Periodo" },
+  Nomina:    { table: "Nomina",   nameField: "Empleado",   refField: null,        valueField: "Valor_Neto", periodoField: "Periodo" },
+  Impuesto:  { table: "Impuestos",nameField: "Tipo",       refField: null,        valueField: "Valor",      periodoField: "Periodo" }
+};
+
+const LINK_FIELD = { Proveedor: "Factura", Nomina: "Nomina_Item", Impuesto: "Impuesto_Item" };
+
+/* ============ ESTADO ============ */
+let extracted = {};
+let categoria = null;
+let pendingItems = [];
+let selectedIds = new Set();
+
+/* ============ HELPERS ============ */
+function parseMoney(str){
+  if(!str) return 0;
+  const clean = str.toString().replace(/[^\d,.-]/g,"").replace(/\./g,"").replace(",",".");
+  const val = parseFloat(clean);
+  return isNaN(val) ? 0 : val;
+}
+function formatMoney(n){
+  return "$" + Math.round(n).toLocaleString("es-CO");
+}
+function setStatus(elId, msg, type){
+  const el = document.getElementById(elId);
+  el.innerHTML = msg ? `<div class="status-msg ${type||''}">${msg}</div>` : "";
+}
+function activateTab(n){
+  for(let i=1;i<=4;i++){
+    const t = document.getElementById(`step${i}Tab`);
+    t.classList.remove('active','done');
+    if(i<n) t.classList.add('done');
+    if(i===n) t.classList.add('active');
+  }
+}
+
+/* ============ PASO 1: EXTRACCIÓN PDF ============ */
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+dropzone.addEventListener('click', ()=> fileInput.click());
+dropzone.addEventListener('dragover', e=>{e.preventDefault(); dropzone.classList.add('drag');});
+dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e=>{
+  e.preventDefault(); dropzone.classList.remove('drag');
+  if(e.dataTransfer.files.length) handlePdf(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e=>{
+  if(e.target.files.length) handlePdf(e.target.files[0]);
+});
+
+async function handlePdf(file){
+  if(file.type !== "application/pdf"){
+    setStatus('extractStatus','El archivo debe ser un PDF.','error');
+    return;
+  }
+  setStatus('extractStatus','Leyendo comprobante...','loading');
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    let text = "";
+    for(let p=1; p<=pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      text += content.items.map(i=>i.str).join(" ") + "\n";
+    }
+    extractFromText(text);
+    setStatus('extractStatus','','');
+  }catch(err){
+    console.error(err);
+    setStatus('extractStatus','No se pudo leer el PDF automáticamente. Completa los datos manualmente abajo.','error');
+    document.getElementById('extractFields').style.display='grid';
+    document.getElementById('row1').style.display='flex';
+  }
+}
+
+function extractFromText(text){
+  const valorMatch = text.match(/valor\s*(pagado|total)?\s*:?\s*\$?\s*([\d.,]+)/i);
+  const confMatch = text.match(/(n[uú]mero de )?confirmaci[oó]n\s*:?\s*([A-Za-z0-9]+)/i);
+  const refMatch = text.match(/referencia\s*(de pago)?\s*:?\s*([A-Za-z0-9\-]+)/i);
+  const cuentaMatch = text.match(/cuenta[^:]*:?\s*([A-Za-zÀ-ÿ0-9\*\s]{4,40}\d{3,})/i);
+  const fechaMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/) || text.match(/(\d{1,2}) de ([A-Za-zé]+) de (\d{4})/i);
+
+  if(valorMatch) document.getElementById('fValor').value = valorMatch[2].replace(/\./g,"").replace(",",".");
+  if(confMatch) document.getElementById('fConfirmacion').value = confMatch[2];
+  if(refMatch) document.getElementById('fReferencia').value = refMatch[2];
+  if(cuentaMatch) document.getElementById('fCuenta').value = cuentaMatch[1].trim();
+
+  if(fechaMatch){
+    let iso = "";
+    if(fechaMatch[0].includes("/")){
+      let [_, d, m, y] = fechaMatch;
+      if(y.length===2) y = "20"+y;
+      iso = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    } else {
+      const meses = {enero:'01',febrero:'02',marzo:'03',abril:'04',mayo:'05',junio:'06',julio:'07',agosto:'08',septiembre:'09',octubre:'10',noviembre:'11',diciembre:'12'};
+      const mm = meses[fechaMatch[2].toLowerCase()];
+      if(mm) iso = `${fechaMatch[3]}-${mm}-${fechaMatch[1].padStart(2,'0')}`;
+    }
+    if(iso) document.getElementById('fFecha').value = iso;
+  }
+
+  document.getElementById('extractFields').style.display='grid';
+  document.getElementById('row1').style.display='flex';
+}
+
+document.getElementById('toStep2').addEventListener('click', ()=>{
+  extracted = {
+    fecha: document.getElementById('fFecha').value,
+    valor: parseMoney(document.getElementById('fValor').value),
+    cuenta: document.getElementById('fCuenta').value,
+    confirmacion: document.getElementById('fConfirmacion').value,
+    referencia: document.getElementById('fReferencia').value
+  };
+  if(!extracted.valor){
+    setStatus('extractStatus','Ingresa al menos el valor pagado antes de continuar.','error');
+    return;
+  }
+  document.getElementById('panel1').style.display='none';
+  document.getElementById('panel2').style.display='block';
+  activateTab(2);
+});
+
+/* ============ PASO 2: CATEGORÍA ============ */
+document.querySelectorAll('.cat-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    categoria = btn.dataset.cat;
+    document.getElementById('toStep3').disabled = false;
+  });
+});
+document.getElementById('back2to1').addEventListener('click', ()=>{
+  document.getElementById('panel2').style.display='none';
+  document.getElementById('panel1').style.display='block';
+  activateTab(1);
+});
+document.getElementById('toStep3').addEventListener('click', async ()=>{
+  document.getElementById('panel2').style.display='none';
+  document.getElementById('panel3').style.display='block';
+  document.getElementById('panel3Title').textContent = `Selecciona los pendientes de ${categoria === 'Proveedor' ? 'facturas' : categoria === 'Nomina' ? 'nómina' : 'impuestos'}`;
+  activateTab(3);
+  await loadPendingItems();
+});
+
+/* ============ PASO 3: CARGAR Y SELECCIONAR PENDIENTES ============ */
+async function loadPendingItems(){
+  const cfg = TABLES[categoria];
+  const list = document.getElementById('itemsList');
+  list.innerHTML = '<div class="empty-state">Cargando pendientes desde Airtable...</div>';
+  try{
+    const formula = encodeURIComponent(`{Estado}='Pendiente'`);
+    const res = await fetch(`${API_URL}/${encodeURIComponent(cfg.table)}?filterByFormula=${formula}`, {
+      headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
+    });
+    if(!res.ok) throw new Error(`Airtable respondió ${res.status}`);
+    const data = await res.json();
+    pendingItems = data.records.map(r=>({
+      id:r.id,
+      nombre:r.fields[cfg.nameField]||'(sin nombre)',
+      ref:cfg.refField ? r.fields[cfg.refField] : null,
+      periodo:r.fields[cfg.periodoField]||'',
+      valor: parseFloat(r.fields[cfg.valueField])||0
+    }));
+    selectedIds = new Set();
+    renderItems(pendingItems);
+  }catch(err){
+    console.error(err);
+    list.innerHTML = `<div class="empty-state">No se pudo conectar con Airtable. Verifica el token y el Base ID en el código.</div>`;
+  }
+}
+
+function renderItems(items){
+  const list = document.getElementById('itemsList');
+  if(!items.length){
+    list.innerHTML = '<div class="empty-state">No hay pendientes en esta categoría.</div>';
+    return;
+  }
+  list.innerHTML = items.map(it=>`
+    <label class="item-row">
+      <input type="checkbox" data-id="${it.id}" ${selectedIds.has(it.id)?'checked':''}>
+      <div class="info">
+        <div class="main">${it.nombre}${it.ref ? ' · '+it.ref : ''}</div>
+        <div class="sub">${it.periodo}</div>
+      </div>
+      <div class="val">${formatMoney(it.valor)}</div>
+    </label>
+  `).join('');
+  list.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      if(cb.checked) selectedIds.add(cb.dataset.id);
+      else selectedIds.delete(cb.dataset.id);
+      updateTotals();
+    });
+  });
+}
+
+document.getElementById('searchBox').addEventListener('input', e=>{
+  const q = e.target.value.toLowerCase();
+  const filtered = pendingItems.filter(it =>
+    it.nombre.toLowerCase().includes(q) ||
+    (it.ref||'').toLowerCase().includes(q) ||
+    (it.periodo||'').toLowerCase().includes(q)
+  );
+  renderItems(filtered);
+});
+
+function updateTotals(){
+  const total = pendingItems.filter(it=>selectedIds.has(it.id)).reduce((s,it)=>s+it.valor,0);
+  const bar = document.getElementById('totalsBar');
+  document.getElementById('selectedTotal').textContent = formatMoney(total);
+  bar.classList.remove('match','mismatch');
+  if(selectedIds.size>0){
+    if(Math.abs(total - extracted.valor) < 1) bar.classList.add('match');
+    else bar.classList.add('mismatch');
+  }
+  document.getElementById('toStep4').disabled = selectedIds.size===0;
+}
+
+document.getElementById('back3to2').addEventListener('click', ()=>{
+  document.getElementById('panel3').style.display='none';
+  document.getElementById('panel2').style.display='block';
+  activateTab(2);
+});
+
+/* ============ PASO 4: REGISTRAR EN AIRTABLE ============ */
+document.getElementById('toStep4').addEventListener('click', async ()=>{
+  const btn = document.getElementById('toStep4');
+  btn.disabled = true;
+  btn.textContent = 'Registrando...';
+  setStatus('globalStatus','','');
+
+  try{
+    const selectedItems = pendingItems.filter(it=>selectedIds.has(it.id));
+
+    // 1. Crear el registro de Pago
+    const pagoRes = await fetch(`${API_URL}/Pagos`, {
+      method:'POST',
+      headers:{ 'Authorization':`Bearer ${AIRTABLE_TOKEN}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ fields:{
+        Fecha: extracted.fecha,
+        Valor_Total: extracted.valor,
+        Cuenta_Origen: extracted.cuenta,
+        N_Confirmacion: extracted.confirmacion,
+        Referencia: extracted.referencia,
+        Categoria: categoria
+      }})
+    });
+    if(!pagoRes.ok) throw new Error('Error creando el registro de Pago: '+pagoRes.status);
+    const pagoData = await pagoRes.json();
+    const pagoId = pagoData.id;
+
+    // 2. Crear PagoDetalle por cada item seleccionado
+    const linkField = LINK_FIELD[categoria];
+    for(const it of selectedItems){
+      const detailFields = { "Pagos":[pagoId], "Valor_Aplicado": it.valor };
+      detailFields[linkField] = [it.id];
+      const detRes = await fetch(`${API_URL}/PagoDetalle`, {
+        method:'POST',
+        headers:{ 'Authorization':`Bearer ${AIRTABLE_TOKEN}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ fields: detailFields })
+      });
+      if(!detRes.ok) throw new Error('Error creando PagoDetalle: '+detRes.status);
+    }
+
+    // 3. Marcar cada item como Pagada/Pagado
+    const cfg = TABLES[categoria];
+    const estadoValor = categoria === 'Impuesto' ? 'Pagado' : 'Pagada';
+    for(const it of selectedItems){
+      const updRes = await fetch(`${API_URL}/${encodeURIComponent(cfg.table)}/${it.id}`, {
+        method:'PATCH',
+        headers:{ 'Authorization':`Bearer ${AIRTABLE_TOKEN}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ fields:{ Estado: estadoValor } })
+      });
+      if(!updRes.ok) throw new Error('Error actualizando estado: '+updRes.status);
+    }
+
+    // 4. Mostrar ticket de confirmación
+    showConfirmation(selectedItems);
+
+  }catch(err){
+    console.error(err);
+    setStatus('globalStatus', `Ocurrió un error: ${err.message}. Revisa la conexión y vuelve a intentar.`, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Registrar pago →';
+  }
+});
+
+function showConfirmation(items){
+  document.getElementById('tFecha').textContent = extracted.fecha || '—';
+  document.getElementById('tValor').textContent = formatMoney(extracted.valor);
+  document.getElementById('tCuenta').textContent = extracted.cuenta || '—';
+  document.getElementById('tReferencia').textContent = extracted.referencia || '—';
+  document.getElementById('tCategoria').textContent = categoria === 'Proveedor' ? 'Factura de proveedor' : categoria === 'Nomina' ? 'Nómina' : 'Impuestos';
+  document.getElementById('tItems').innerHTML = items.map(it=>`
+    <div class="ti"><span>${it.nombre}${it.ref?' · '+it.ref:''}</span><span>${formatMoney(it.valor)}</span></div>
+  `).join('');
+
+  document.getElementById('panel3').style.display='none';
+  document.getElementById('panel4').style.display='block';
+  activateTab(4);
+}
+
+document.getElementById('newPago').addEventListener('click', ()=>{
+  extracted = {}; categoria = null; pendingItems=[]; selectedIds = new Set();
+  document.getElementById('fFecha').value='';
+  document.getElementById('fValor').value='';
+  document.getElementById('fCuenta').value='';
+  document.getElementById('fConfirmacion').value='';
+  document.getElementById('fReferencia').value='';
+  document.getElementById('extractFields').style.display='none';
+  document.getElementById('row1').style.display='none';
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('toStep3').disabled = true;
+  fileInput.value='';
+
+  document.getElementById('panel4').style.display='none';
+  document.getElementById('panel1').style.display='block';
+  activateTab(1);
+});
+
+activateTab(1);
+</script>
+
+</body>
+</html>
