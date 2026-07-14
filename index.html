@@ -489,8 +489,18 @@ let selectedIds = new Set();
 /* ============ HELPERS ============ */
 function parseMoney(str){
   if(!str) return 0;
-  const clean = str.toString().replace(/[^\d,.-]/g,"").replace(/\./g,"").replace(",",".");
-  const val = parseFloat(clean);
+  let s = str.toString().trim().replace(/[^\d.,-]/g,"");
+  if(!s) return 0;
+  // Si termina en ",NN" o ".NN" (2 dígitos), esa es la parte decimal real.
+  const decMatch = s.match(/[.,](\d{2})$/);
+  if(decMatch){
+    const intPart = s.slice(0, s.length-3).replace(/[.,]/g,"");
+    s = intPart + "." + decMatch[1];
+  } else {
+    // No hay parte decimal: cualquier punto o coma es separador de miles.
+    s = s.replace(/[.,]/g,"");
+  }
+  const val = parseFloat(s);
   return isNaN(val) ? 0 : val;
 }
 function formatMoney(n){
