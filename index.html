@@ -233,6 +233,26 @@
   }
   .empty-state{padding:40px 20px;text-align:center;color:var(--gray);font-size:14px;}
 
+  .form-section-title{
+    font-family:'Libre Baskerville',serif;
+    font-size:15px;
+    color:var(--navy);
+    margin:22px 0 10px 0;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--gray-light);
+  }
+  .form-section-title:first-child{margin-top:0;}
+  select{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--gray-light);
+    border-radius:6px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    background:var(--paper);
+  }
+
   .btn-consulta{
     background:transparent;
     border:1px solid var(--gold);
@@ -248,6 +268,7 @@
 
   .consulta-tabs{
     display:flex;
+    align-items:center;
     gap:8px;
     margin-bottom:18px;
   }
@@ -412,7 +433,10 @@
     <span>Conciliación de Pagos</span>
   </div>
   <div class="sub" id="topbarSub">Fase 1 · Registro de comprobantes</div>
-  <button class="btn-consulta" id="openConsulta">📋 Consultar pagos y pendientes</button>
+  <div style="display:flex; gap:10px;">
+    <button class="btn-consulta" id="openFacturaXML">📄 Registrar factura</button>
+    <button class="btn-consulta" id="openConsulta">📋 Consultar pagos y pendientes</button>
+  </div>
 </div>
 
 <div class="wrap">
@@ -546,11 +570,184 @@
       <div class="consulta-tab active" id="ctabPendientes">Pendientes</div>
       <div class="consulta-tab" id="ctabHistorial">Historial de pagos</div>
       <div class="consulta-tab" id="ctabImpuestos">Impuestos</div>
+      <div style="flex:1;"></div>
+      <button class="btn btn-ghost" id="refreshConsulta" style="padding:8px 14px;font-size:13px;" title="Volver a consultar Airtable (por defecto usamos los datos ya cargados en esta sesión, para ahorrar llamadas)">🔄 Actualizar</button>
     </div>
 
     <div id="consultaPendientesView"></div>
     <div id="consultaHistorialView" style="display:none;"></div>
     <div id="consultaImpuestosView" style="display:none;"></div>
+  </div>
+
+  <!-- PANEL REGISTRAR FACTURA NUEVA -->
+  <div class="card" id="panelFacturaXML" style="display:none;">
+    <div class="btn-row" style="justify-content:space-between; margin-bottom:14px;">
+      <h2 style="margin:0;">Registrar factura nueva</h2>
+      <button class="btn btn-ghost" id="backFromFacturaXML">← Volver</button>
+    </div>
+    <p class="hint">Sube el XML de la factura electrónica (o el AttachedDocument de la DIAN) y extraemos los datos automáticamente, o ingrésalos a mano si no tienes el archivo.</p>
+
+    <div id="facturaXMLIntake">
+      <div class="dropzone" id="dropzoneXML">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8A93A6" stroke-width="1.6"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        <p><strong>Haz clic para subir</strong> o arrastra el XML aquí</p>
+      </div>
+      <input type="file" id="fileInputXML" accept=".xml,text/xml,application/xml">
+      <div id="xmlStatus"></div>
+      <div class="btn-row" style="justify-content:center;">
+        <button class="btn btn-ghost" id="manualEntryBtn">✍️ Ingresar manualmente, sin XML</button>
+      </div>
+    </div>
+
+    <div id="facturaFields" style="display:none; margin-top:20px;">
+
+      <h3 class="form-section-title">Datos generales</h3>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Proveedor / Razón social</label>
+          <input type="text" id="xfProveedor" placeholder="Nombre del proveedor">
+        </div>
+        <div class="field">
+          <label>NIT / CC</label>
+          <input type="text" id="xfNIT" placeholder="Ej. 830114921">
+        </div>
+        <div class="field">
+          <label>N° Factura</label>
+          <input type="text" id="xfNFactura" placeholder="Ej. FCPT13838804">
+        </div>
+        <div class="field">
+          <label>Fecha de la factura</label>
+          <input type="date" id="xfFechaFactura">
+        </div>
+        <div class="field">
+          <label>Período (AAAA-MM)</label>
+          <input type="text" id="xfPeriodo" placeholder="Ej. 2026-06">
+        </div>
+        <div class="field">
+          <label>Tipo de proveedor</label>
+          <select id="xfTipoProveedor">
+            <option value="">—</option>
+            <option>Persona Natural</option>
+            <option>Persona Jurídica</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>N° Proyecto</label>
+          <input type="text" id="xfProyecto" placeholder="Ej. ADMON, SAN ANTONIO">
+        </div>
+        <div class="field">
+          <label># Documento soporte</label>
+          <input type="text" id="xfDocSoporte" placeholder="Ej. HB 101">
+        </div>
+        <div class="field">
+          <label>Deducible</label>
+          <select id="xfDeducible">
+            <option value="">—</option>
+            <option>Deducible</option>
+            <option>No deducible</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nombre de archivo</label>
+          <input type="text" id="xfNombreArchivo" placeholder="Se sugiere automáticamente">
+        </div>
+      </div>
+
+      <h3 class="form-section-title">Valores</h3>
+      <div class="fields-grid">
+        <div class="field money">
+          <label>Valor bruto (antes de IVA)</label>
+          <input type="text" id="xfValorBruto" placeholder="0">
+        </div>
+        <div class="field money">
+          <label>IVA</label>
+          <input type="text" id="xfIVA" placeholder="0">
+        </div>
+        <div class="field money">
+          <label>Impuesto al consumo</label>
+          <input type="text" id="xfImpConsumo" placeholder="0">
+        </div>
+        <div class="field money">
+          <label>Anticipo</label>
+          <input type="text" id="xfAnticipo" placeholder="0">
+        </div>
+        <div class="field money">
+          <label>Caja menor</label>
+          <input type="text" id="xfCajaMenor" placeholder="0">
+        </div>
+        <div class="field money">
+          <label>Valor neto (total a pagar)</label>
+          <input type="text" id="xfValorNeto" placeholder="0">
+        </div>
+      </div>
+
+      <h3 class="form-section-title">Retenciones y clasificación</h3>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Tipo de retención</label>
+          <select id="xfTipoRetencion">
+            <option value="">—</option>
+            <option>Servicios</option>
+            <option>Compras</option>
+            <option>Arrendamientos</option>
+            <option>Otros</option>
+            <option>No aplica</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>% Rte. Fuente</label>
+          <input type="text" id="xfTarifaRteFte" placeholder="Ej. 0,04">
+        </div>
+        <div class="field money">
+          <label>Rte. Fuente ($)</label>
+          <input type="text" id="xfRteFuente" placeholder="0">
+        </div>
+        <div class="field">
+          <label>% Rte. ICA</label>
+          <input type="text" id="xfTarifaRteICA" placeholder="Ej. 0,00966">
+        </div>
+        <div class="field money">
+          <label>Rte. ICA ($)</label>
+          <input type="text" id="xfRteICA" placeholder="0">
+        </div>
+        <div class="field">
+          <label>Mes declaración Rte Fte</label>
+          <select id="xfMesDeclaracion">
+            <option value="">—</option>
+            <option>Enero</option><option>Febrero</option><option>Marzo</option><option>Abril</option>
+            <option>Mayo</option><option>Junio</option><option>Julio</option><option>Agosto</option>
+            <option>Septiembre</option><option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Clasificación de costo</label>
+          <input type="text" id="xfClasificacionCosto" placeholder="Ej. ADMON, SAN ANTONIO, GRANADA">
+        </div>
+        <div class="field">
+          <label>Subcategoría</label>
+          <input type="text" id="xfSubcategoria" placeholder="Ej. IMPUESTOS, PERSONAL, ACTIVOS">
+        </div>
+        <div class="field" style="display:flex; align-items:center; gap:8px; margin-top:22px;">
+          <input type="checkbox" id="xfAprobacion" style="width:18px;height:18px;">
+          <label style="margin:0;">Aprobación</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row" id="facturaSaveRow" style="display:none;">
+      <button class="btn btn-ghost" id="cancelFacturaForm">← Cancelar</button>
+      <button class="btn btn-primary" id="saveFacturaPendiente">Guardar como pendiente →</button>
+    </div>
+
+    <div id="facturaSavedMsg" style="display:none;">
+      <div class="ticket-head" style="padding:20px 0 0 0;">
+        <div class="check">✓</div>
+        <h2>Factura guardada como pendiente</h2>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="registerAnotherFactura" style="width:100%;">Registrar otra factura</button>
+      </div>
+    </div>
   </div>
 
   <div id="globalStatus"></div>
@@ -832,30 +1029,39 @@ document.getElementById('toStep4').addEventListener('click', async ()=>{
     const pagoData = await pagoRes.json();
     const pagoId = pagoData.id;
 
-    // 2. Crear PagoDetalle por cada item seleccionado
+    // 2. Crear PagoDetalle por cada item seleccionado (en lotes de hasta 10, como permite Airtable)
     const linkField = LINK_FIELD[categoria];
-    for(const it of selectedItems){
+    const detailRecords = selectedItems.map(it=>{
       const detailFields = { "Pagos":[pagoId], "Valor_Aplicado": it.valor };
       detailFields[linkField] = [it.id];
+      return { fields: detailFields };
+    });
+    for(let i=0; i<detailRecords.length; i+=10){
+      const chunk = detailRecords.slice(i, i+10);
       const detRes = await fetch(`${API_URL}/PagoDetalle`, {
         method:'POST',
         headers:{ 'Authorization':`Bearer ${AIRTABLE_TOKEN}`, 'Content-Type':'application/json' },
-        body: JSON.stringify({ fields: detailFields })
+        body: JSON.stringify({ records: chunk })
       });
       if(!detRes.ok) throw new Error('Error creando PagoDetalle: '+detRes.status);
     }
 
-    // 3. Marcar cada item como Pagada/Pagado
+    // 3. Marcar cada item como Pagada/Pagado (tambien en lotes de hasta 10)
     const cfg = TABLES[categoria];
     const estadoValor = categoria === 'Impuesto' ? 'Pagado' : 'Pagada';
-    for(const it of selectedItems){
-      const updRes = await fetch(`${API_URL}/${encodeURIComponent(cfg.table)}/${it.id}`, {
+    const updateRecords = selectedItems.map(it=>({ id: it.id, fields:{ Estado: estadoValor } }));
+    for(let i=0; i<updateRecords.length; i+=10){
+      const chunk = updateRecords.slice(i, i+10);
+      const updRes = await fetch(`${API_URL}/${encodeURIComponent(cfg.table)}`, {
         method:'PATCH',
         headers:{ 'Authorization':`Bearer ${AIRTABLE_TOKEN}`, 'Content-Type':'application/json' },
-        body: JSON.stringify({ fields:{ Estado: estadoValor } })
+        body: JSON.stringify({ records: chunk })
       });
       if(!updRes.ok) throw new Error('Error actualizando estado: '+updRes.status);
     }
+
+    // Un pago nuevo cambia los pendientes/historial/impuestos: invalidamos el cache de Consultar
+    invalidateConsultaCache();
 
     // 4. Mostrar ticket de confirmación
     showConfirmation(selectedItems);
@@ -927,7 +1133,7 @@ function extractNombre(fields, nameField){
 }
 
 document.getElementById('openConsulta').addEventListener('click', ()=>{
-  ['panel1','panel2','panel3','panel4'].forEach(id=>document.getElementById(id).style.display='none');
+  ['panel1','panel2','panel3','panel4','panelFacturaXML'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('panelConsulta').style.display='block';
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active','done'));
   switchConsultaTab('pendientes');
@@ -949,8 +1155,19 @@ function switchConsultaTab(tab){
   });
 }
 
+/* Cache en memoria para esta sesión: evita repetir llamadas a Airtable
+   cada vez que se cambia de pestaña. Se invalida al registrar un pago
+   o una factura nueva, o manualmente con el botón "Actualizar". */
+const consultaCache = { pendientes:null, historial:null, impuestos:null };
+function invalidateConsultaCache(){
+  consultaCache.pendientes = null;
+  consultaCache.historial = null;
+  consultaCache.impuestos = null;
+}
+
 document.getElementById('ctabPendientes').addEventListener('click', ()=>{
   switchConsultaTab('pendientes');
+  loadConsultaPendientes();
 });
 
 document.getElementById('ctabHistorial').addEventListener('click', ()=>{
@@ -963,8 +1180,16 @@ document.getElementById('ctabImpuestos').addEventListener('click', ()=>{
   loadConsultaImpuestos();
 });
 
+document.getElementById('refreshConsulta').addEventListener('click', ()=>{
+  const activeTab = document.querySelector('.consulta-tab.active').id;
+  if(activeTab==='ctabPendientes'){ consultaCache.pendientes=null; loadConsultaPendientes(); }
+  if(activeTab==='ctabHistorial'){ consultaCache.historial=null; loadConsultaHistorial(); }
+  if(activeTab==='ctabImpuestos'){ consultaCache.impuestos=null; loadConsultaImpuestos(); }
+});
+
 async function loadConsultaPendientes(){
   const view = document.getElementById('consultaPendientesView');
+  if(consultaCache.pendientes){ view.innerHTML = consultaCache.pendientes; return; }
   view.innerHTML = '<div class="empty-state">Cargando pendientes desde Airtable...</div>';
   try{
     const cats = ['Nomina','Proveedor','Impuesto'];
@@ -1004,6 +1229,7 @@ async function loadConsultaPendientes(){
         </div>
       </div>`;
     }
+    consultaCache.pendientes = html;
     view.innerHTML = html;
   }catch(err){
     console.error(err);
@@ -1011,8 +1237,24 @@ async function loadConsultaPendientes(){
   }
 }
 
+function attachHistorialRowListeners(){
+  document.querySelectorAll('.hist-row').forEach(row=>{
+    row.addEventListener('click', async ()=>{
+      const detailEl = row.querySelector('.hist-detail');
+      const isOpen = detailEl.classList.contains('open');
+      document.querySelectorAll('.hist-detail.open').forEach(d=>d.classList.remove('open'));
+      if(isOpen) return;
+      detailEl.classList.add('open');
+      if(detailEl.dataset.loaded) return;
+      await loadPagoDetalle(row.dataset.pagoId, row.dataset.categoria, detailEl);
+      detailEl.dataset.loaded = '1';
+    });
+  });
+}
+
 async function loadConsultaHistorial(){
   const view = document.getElementById('consultaHistorialView');
+  if(consultaCache.historial){ view.innerHTML = consultaCache.historial; attachHistorialRowListeners(); return; }
   view.innerHTML = '<div class="empty-state">Cargando historial desde Airtable...</div>';
   try{
     const sortParams = `sort[0][field]=Fecha&sort[0][direction]=asc`;
@@ -1027,7 +1269,7 @@ async function loadConsultaHistorial(){
       return;
     }
 
-    view.innerHTML = `<div class="items-list">${data.records.map(r=>{
+    const html = `<div class="items-list">${data.records.map(r=>{
       const f = r.fields;
       const ajuste = parseFloat(f.Ajuste_Redondeo)||0;
       return `<div class="hist-row" data-pago-id="${r.id}" data-categoria="${f.Categoria||''}">
@@ -1043,18 +1285,9 @@ async function loadConsultaHistorial(){
       </div>`;
     }).join('')}</div>`;
 
-    document.querySelectorAll('.hist-row').forEach(row=>{
-      row.addEventListener('click', async ()=>{
-        const detailEl = row.querySelector('.hist-detail');
-        const isOpen = detailEl.classList.contains('open');
-        document.querySelectorAll('.hist-detail.open').forEach(d=>d.classList.remove('open'));
-        if(isOpen) return;
-        detailEl.classList.add('open');
-        if(detailEl.dataset.loaded) return;
-        await loadPagoDetalle(row.dataset.pagoId, row.dataset.categoria, detailEl);
-        detailEl.dataset.loaded = '1';
-      });
-    });
+    consultaCache.historial = html;
+    view.innerHTML = html;
+    attachHistorialRowListeners();
   }catch(err){
     console.error(err);
     view.innerHTML = `<div class="empty-state">No se pudo conectar con Airtable. Verifica el token y el Base ID en el código.</div>`;
@@ -1073,6 +1306,7 @@ const TAX_FIELDS = [
 
 async function loadConsultaImpuestos(){
   const view = document.getElementById('consultaImpuestosView');
+  if(consultaCache.impuestos){ view.innerHTML = consultaCache.impuestos; return; }
   view.innerHTML = '<div class="empty-state">Cargando impuestos y retenciones desde Airtable...</div>';
   try{
     // Traemos todas las tablas involucradas una sola vez (pagadas + pendientes, para proyectar lo que se viene)
@@ -1144,6 +1378,7 @@ async function loadConsultaImpuestos(){
       html += `</div>`;
     });
 
+    consultaCache.impuestos = html;
     view.innerHTML = html;
   }catch(err){
     console.error(err);
@@ -1162,21 +1397,31 @@ async function loadPagoDetalle(pagoId, categoria, detailEl){
     const linkField = LINK_FIELD[categoria];
     const cfg = TABLES[categoria];
 
-    const rows = await Promise.all(data.records.map(async det=>{
+    const itemIds = data.records
+      .map(det => det.fields[linkField] ? det.fields[linkField][0] : null)
+      .filter(Boolean);
+
+    // Una sola llamada trae TODOS los ítems del pago (en vez de una llamada por ítem)
+    let itemsById = {};
+    if(itemIds.length){
+      const uniqueIds = [...new Set(itemIds)];
+      const idsFormula = uniqueIds.map(id=>`RECORD_ID()="${id}"`).join(',');
+      const batchFormula = encodeURIComponent(`OR(${idsFormula})`);
+      const itemsRes = await fetch(`${API_URL}/${encodeURIComponent(cfg.table)}?filterByFormula=${batchFormula}`, {
+        headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
+      });
+      if(itemsRes.ok){
+        const itemsData = await itemsRes.json();
+        itemsData.records.forEach(r=>{ itemsById[r.id] = r.fields; });
+      }
+    }
+
+    const rows = data.records.map(det=>{
       const itemId = det.fields[linkField] ? det.fields[linkField][0] : null;
       const valor = parseFloat(det.fields.Valor_Aplicado)||0;
-      if(!itemId) return { nombre:'(ítem no encontrado)', valor };
-      try{
-        const itemRes = await fetch(`${API_URL}/${encodeURIComponent(cfg.table)}/${itemId}`, {
-          headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
-        });
-        if(!itemRes.ok) return { nombre:'(ítem no encontrado)', valor };
-        const itemData = await itemRes.json();
-        return { nombre: extractNombre(itemData.fields, cfg.nameField), valor };
-      }catch{
-        return { nombre:'(ítem no encontrado)', valor };
-      }
-    }));
+      if(!itemId || !itemsById[itemId]) return { nombre:'(ítem no encontrado)', valor };
+      return { nombre: extractNombre(itemsById[itemId], cfg.nameField), valor };
+    });
 
     detailEl.innerHTML = rows.length
       ? rows.map(r=>`<div class="di-row"><span>${r.nombre}</span><span>${formatMoney(r.valor)}</span></div>`).join('')
@@ -1186,6 +1431,309 @@ async function loadPagoDetalle(pagoId, categoria, detailEl){
     detailEl.innerHTML = '<div class="empty-state">No se pudo cargar el detalle.</div>';
   }
 }
+
+/* ============ REGISTRAR FACTURA NUEVA (XML + MANUAL) ============ */
+
+document.getElementById('openFacturaXML').addEventListener('click', ()=>{
+  ['panel1','panel2','panel3','panel4','panelConsulta'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('panelFacturaXML').style.display='block';
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active','done'));
+  resetFacturaForm();
+});
+
+document.getElementById('backFromFacturaXML').addEventListener('click', ()=>{
+  document.getElementById('panelFacturaXML').style.display='none';
+  document.getElementById('panel1').style.display='block';
+  activateTab(1);
+});
+
+document.getElementById('manualEntryBtn').addEventListener('click', ()=>{
+  showFacturaForm({});
+});
+
+document.getElementById('cancelFacturaForm').addEventListener('click', ()=>{
+  resetFacturaForm();
+});
+
+document.getElementById('registerAnotherFactura').addEventListener('click', ()=>{
+  resetFacturaForm();
+});
+
+const FACTURA_FIELD_IDS = [
+  'xfProveedor','xfNIT','xfNFactura','xfFechaFactura','xfPeriodo','xfTipoProveedor','xfProyecto',
+  'xfDocSoporte','xfDeducible','xfNombreArchivo','xfValorBruto','xfIVA','xfImpConsumo','xfAnticipo',
+  'xfCajaMenor','xfValorNeto','xfTipoRetencion','xfTarifaRteFte','xfRteFuente','xfTarifaRteICA',
+  'xfRteICA','xfMesDeclaracion','xfClasificacionCosto','xfSubcategoria'
+];
+
+function resetFacturaForm(){
+  document.getElementById('facturaXMLIntake').style.display='block';
+  document.getElementById('facturaFields').style.display='none';
+  document.getElementById('facturaSaveRow').style.display='none';
+  document.getElementById('facturaSavedMsg').style.display='none';
+  setStatus('xmlStatus','','');
+  fileInputXML.value='';
+  FACTURA_FIELD_IDS.forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('xfAprobacion').checked = false;
+}
+
+function showFacturaForm(data){
+  document.getElementById('facturaXMLIntake').style.display='none';
+  document.getElementById('facturaFields').style.display='block';
+  document.getElementById('facturaSaveRow').style.display='flex';
+  document.getElementById('facturaSavedMsg').style.display='none';
+
+  document.getElementById('xfProveedor').value = data.proveedor || '';
+  document.getElementById('xfNIT').value = data.nit || '';
+  document.getElementById('xfNFactura').value = data.nFactura || '';
+  document.getElementById('xfFechaFactura').value = data.fechaFactura || '';
+  document.getElementById('xfPeriodo').value = data.periodo || '';
+  document.getElementById('xfTipoProveedor').value = data.tipoProveedor || '';
+  document.getElementById('xfProyecto').value = '';
+  document.getElementById('xfDocSoporte').value = '';
+  document.getElementById('xfDeducible').value = 'Deducible';
+  document.getElementById('xfNombreArchivo').value = data.nombreArchivoSugerido || '';
+  document.getElementById('xfValorBruto').value = data.valorBruto!=null ? data.valorBruto : '';
+  document.getElementById('xfIVA').value = data.iva!=null ? data.iva : '';
+  document.getElementById('xfImpConsumo').value = '';
+  document.getElementById('xfAnticipo').value = '';
+  document.getElementById('xfCajaMenor').value = '';
+  document.getElementById('xfValorNeto').value = data.valorNeto!=null ? data.valorNeto : '';
+  document.getElementById('xfTipoRetencion').value = 'No aplica';
+  document.getElementById('xfTarifaRteFte').value = '';
+  document.getElementById('xfRteFuente').value = '';
+  document.getElementById('xfTarifaRteICA').value = '';
+  document.getElementById('xfRteICA').value = '';
+  document.getElementById('xfMesDeclaracion').value = '';
+  document.getElementById('xfClasificacionCosto').value = '';
+  document.getElementById('xfSubcategoria').value = '';
+  document.getElementById('xfAprobacion').checked = false;
+}
+
+/* --- Dropzone XML --- */
+const dropzoneXML = document.getElementById('dropzoneXML');
+const fileInputXML = document.getElementById('fileInputXML');
+dropzoneXML.addEventListener('click', ()=> fileInputXML.click());
+dropzoneXML.addEventListener('dragover', e=>{e.preventDefault(); dropzoneXML.classList.add('drag');});
+dropzoneXML.addEventListener('dragleave', ()=> dropzoneXML.classList.remove('drag'));
+dropzoneXML.addEventListener('drop', e=>{
+  e.preventDefault(); dropzoneXML.classList.remove('drag');
+  if(e.dataTransfer.files.length) handleXML(e.dataTransfer.files[0]);
+});
+fileInputXML.addEventListener('change', e=>{
+  if(e.target.files.length) handleXML(e.target.files[0]);
+});
+
+async function handleXML(file){
+  setStatus('xmlStatus','Leyendo factura XML...','loading');
+  try{
+    const rawText = await file.text();
+    const extracted = parseDianXML(rawText);
+    setStatus('xmlStatus','','');
+    showFacturaForm(extracted);
+  }catch(err){
+    console.error(err);
+    setStatus('xmlStatus','No se pudo leer el XML automáticamente. Completa los datos manualmente abajo.','error');
+    showFacturaForm({});
+  }
+}
+
+/* Helpers para navegar el XML sin depender de prefijos de namespace (cbc:, cac:, etc.) */
+function findByLocalName(root, localName){
+  if(!root) return null;
+  if(root.localName === localName) return root;
+  const all = root.getElementsByTagName('*');
+  for(let i=0;i<all.length;i++){ if(all[i].localName === localName) return all[i]; }
+  return null;
+}
+function directChild(root, localName){
+  if(!root) return null;
+  for(const child of root.children){ if(child.localName === localName) return child; }
+  return null;
+}
+function textOf(el){
+  return el ? el.textContent.trim() : null;
+}
+
+function parseDianXML(rawText){
+  // Los XML de la DIAN suelen venir envueltos en un AttachedDocument;
+  // la factura real (<Invoice>...</Invoice>) va incrustada como texto dentro de ese wrapper.
+  let invoiceXmlText = rawText;
+  const startIdx = rawText.indexOf('<Invoice ');
+  const endIdx = rawText.indexOf('</Invoice>');
+  if(startIdx !== -1 && endIdx !== -1){
+    invoiceXmlText = rawText.substring(startIdx, endIdx + '</Invoice>'.length);
+    invoiceXmlText = invoiceXmlText
+      .replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+      .replace(/&quot;/g,'"').replace(/&apos;/g,"'")
+      .replace(/&amp;/g,'&');
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(invoiceXmlText, 'application/xml');
+  if(doc.querySelector('parsererror')){
+    throw new Error('No se pudo interpretar el XML de la factura.');
+  }
+  const invoiceRoot = doc.documentElement;
+
+  const nFactura = textOf(directChild(invoiceRoot, 'ID'));
+
+  const supplierParty = findByLocalName(invoiceRoot, 'AccountingSupplierParty');
+  const partyLegalEntity = supplierParty ? findByLocalName(supplierParty, 'PartyLegalEntity') : null;
+  const proveedor = textOf(partyLegalEntity ? directChild(partyLegalEntity, 'RegistrationName') : findByLocalName(supplierParty, 'RegistrationName'));
+  const partyTaxScheme = supplierParty ? findByLocalName(supplierParty, 'PartyTaxScheme') : null;
+  const nit = textOf(partyTaxScheme ? directChild(partyTaxScheme, 'CompanyID') : findByLocalName(supplierParty, 'CompanyID'));
+
+  const monetaryTotal = findByLocalName(invoiceRoot, 'LegalMonetaryTotal');
+  const valorBrutoTxt = textOf(monetaryTotal ? (directChild(monetaryTotal,'TaxExclusiveAmount') || directChild(monetaryTotal,'LineExtensionAmount')) : null);
+  const valorNetoTxt = textOf(monetaryTotal ? directChild(monetaryTotal,'PayableAmount') : null);
+
+  // IVA: suma de TaxAmount dentro de cada TaxTotal (puede haber varios: IVA, retenciones, etc.)
+  const taxTotalEls = Array.from(invoiceRoot.getElementsByTagName('*')).filter(el=>el.localName==='TaxTotal');
+  let ivaTxt = null;
+  if(taxTotalEls.length){
+    // Tomamos el primer TaxTotal como el de IVA (es la convención más común en facturas DIAN)
+    ivaTxt = textOf(directChild(taxTotalEls[0], 'TaxAmount'));
+  }
+
+  const issueDate = textOf(directChild(invoiceRoot, 'IssueDate'));
+  let periodo = '';
+  if(issueDate && /^\d{4}-\d{2}/.test(issueDate)) periodo = issueDate.slice(0,7);
+
+  // Tipo de proveedor: el esquema de identificación de la DIAN usa schemeName/schemeID;
+  // NIT (persona jurídica) suele venir como "31", cédula (persona natural) como "13".
+  let tipoProveedor = '';
+  if(partyTaxScheme){
+    const companyIdEl = directChild(partyTaxScheme, 'CompanyID');
+    const schemeId = companyIdEl ? companyIdEl.getAttribute('schemeID') : null;
+    if(schemeId === '31') tipoProveedor = 'Persona Jurídica';
+    else if(schemeId === '13') tipoProveedor = 'Persona Natural';
+  }
+
+  const nombreArchivoSugerido = (proveedor && nFactura)
+    ? `${(proveedor||'').replace(/[^A-Za-z0-9À-ÿ ]/g,'').replace(/\s+/g,'_').toUpperCase()}_${nFactura}`
+    : '';
+
+  return {
+    proveedor: proveedor || '',
+    nit: nit || '',
+    nFactura: nFactura || '',
+    periodo,
+    fechaFactura: issueDate || '',
+    tipoProveedor,
+    nombreArchivoSugerido,
+    valorBruto: valorBrutoTxt ? parseMoney(valorBrutoTxt) : null,
+    valorNeto: valorNetoTxt ? parseMoney(valorNetoTxt) : null,
+    iva: ivaTxt ? parseMoney(ivaTxt) : null
+  };
+}
+
+function parsePercent(str){
+  if(!str) return 0;
+  let s = str.toString().trim().replace(/[^\d.,-]/g,"").replace(",", ".");
+  const val = parseFloat(s);
+  return isNaN(val) ? 0 : val;
+}
+
+document.getElementById('saveFacturaPendiente').addEventListener('click', async ()=>{
+  const proveedor = document.getElementById('xfProveedor').value.trim();
+  const nit = document.getElementById('xfNIT').value.trim();
+  const nFactura = document.getElementById('xfNFactura').value.trim();
+  const periodo = document.getElementById('xfPeriodo').value.trim();
+  const valorBruto = parseMoney(document.getElementById('xfValorBruto').value);
+  const valorNeto = parseMoney(document.getElementById('xfValorNeto').value);
+  const rteFuente = parseMoney(document.getElementById('xfRteFuente').value);
+  const rteICA = parseMoney(document.getElementById('xfRteICA').value);
+
+  if(!proveedor || !valorNeto){
+    setStatus('xmlStatus','Como mínimo necesitas Proveedor y Valor neto para guardar.','error');
+    return;
+  }
+
+  const btn = document.getElementById('saveFacturaPendiente');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const fields = {
+      Proveedor: proveedor,
+      NIT: nit,
+      N_Factura: nFactura,
+      Periodo: periodo,
+      Valor_Bruto: valorBruto,
+      Valor_Neto: valorNeto,
+      Estado: 'Pendiente'
+    };
+    if(rteFuente) fields.Rte_Fuente = rteFuente;
+    if(rteICA) fields.Rte_ICA = rteICA;
+
+    // Campos nuevos (paridad con el Excel) — solo se envían si tienen valor
+    const fechaFactura = document.getElementById('xfFechaFactura').value;
+    if(fechaFactura) fields.Fecha_Factura = fechaFactura;
+
+    const tipoProveedor = document.getElementById('xfTipoProveedor').value;
+    if(tipoProveedor) fields.Tipo_Proveedor = tipoProveedor;
+
+    const proyecto = document.getElementById('xfProyecto').value.trim();
+    if(proyecto) fields.Proyecto = proyecto;
+
+    const docSoporte = document.getElementById('xfDocSoporte').value.trim();
+    if(docSoporte) fields.Doc_Soporte = docSoporte;
+
+    const deducible = document.getElementById('xfDeducible').value;
+    if(deducible) fields.Deducible = deducible;
+
+    const nombreArchivo = document.getElementById('xfNombreArchivo').value.trim();
+    if(nombreArchivo) fields.Nombre_Archivo = nombreArchivo;
+
+    const iva = parseMoney(document.getElementById('xfIVA').value);
+    if(iva) fields.IVA = iva;
+
+    const impConsumo = parseMoney(document.getElementById('xfImpConsumo').value);
+    if(impConsumo) fields.Imp_Consumo = impConsumo;
+
+    const anticipo = parseMoney(document.getElementById('xfAnticipo').value);
+    if(anticipo) fields.Anticipo = anticipo;
+
+    const cajaMenor = parseMoney(document.getElementById('xfCajaMenor').value);
+    if(cajaMenor) fields.Caja_Menor = cajaMenor;
+
+    const tipoRetencion = document.getElementById('xfTipoRetencion').value;
+    if(tipoRetencion) fields.Tipo_Retencion = tipoRetencion;
+
+    const tarifaRteFte = document.getElementById('xfTarifaRteFte').value.trim();
+    if(tarifaRteFte) fields.Tarifa_RteFte = parsePercent(tarifaRteFte);
+
+    const tarifaRteICA = document.getElementById('xfTarifaRteICA').value.trim();
+    if(tarifaRteICA) fields.Tarifa_RteICA = parsePercent(tarifaRteICA);
+
+    const mesDeclaracion = document.getElementById('xfMesDeclaracion').value;
+    if(mesDeclaracion) fields.Mes_Declaracion_RteFte = mesDeclaracion;
+
+    const clasificacionCosto = document.getElementById('xfClasificacionCosto').value.trim();
+    if(clasificacionCosto) fields.Clasificacion_Costo = clasificacionCosto;
+
+    const subcategoria = document.getElementById('xfSubcategoria').value.trim();
+    if(subcategoria) fields.Subcategoria = subcategoria;
+
+    fields.Aprobacion = document.getElementById('xfAprobacion').checked;
+
+    const res = await fetch(`${API_URL}/Facturas`, {
+      method:'POST',
+      headers:{ 'Authorization':`Bearer ${AIRTABLE_TOKEN}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    if(!res.ok) throw new Error(`Airtable respondió ${res.status}`);
+
+    document.getElementById('facturaFields').style.display='none';
+    document.getElementById('facturaSaveRow').style.display='none';
+    invalidateConsultaCache();
+    document.getElementById('facturaSavedMsg').style.display='block';
+  }catch(err){
+    console.error(err);
+    setStatus('xmlStatus','No se pudo guardar en Airtable. Verifica el token y el Base ID en el código.','error');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Guardar como pendiente →';
+  }
+});
 </script>
 
 </body>
