@@ -456,6 +456,7 @@
       <div class="ticket-row"><span class="k">Referencia</span><span class="v" id="tReferencia"></span></div>
       <div class="ticket-row"><span class="k">Categoría</span><span class="v" id="tCategoria"></span></div>
       <div class="ticket-items" id="tItems"></div>
+      <div class="ticket-row" id="tAjuste" style="display:none; color:#b45309; font-weight:600;"></div>
       <div class="btn-row">
         <button class="btn btn-primary" id="newPago" style="width:100%;">Registrar otro pago</button>
       </div>
@@ -720,6 +721,8 @@ document.getElementById('toStep4').addEventListener('click', async ()=>{
 
   try{
     const selectedItems = pendingItems.filter(it=>selectedIds.has(it.id));
+    const totalSeleccionado = selectedItems.reduce((s,it)=>s+it.valor,0);
+    const ajusteRedondeo = Math.round((extracted.valor - totalSeleccionado) * 100) / 100;
 
     // 1. Crear el registro de Pago
     const pagoRes = await fetch(`${API_URL}/Pagos`, {
@@ -731,7 +734,8 @@ document.getElementById('toStep4').addEventListener('click', async ()=>{
         Cuenta_Origen: extracted.cuenta,
         N_Confirmacion: extracted.confirmacion,
         Referencia: extracted.referencia,
-        Categoria: categoria
+        Categoria: categoria,
+        Ajuste_Redondeo: ajusteRedondeo
       }})
     });
     if(!pagoRes.ok) throw new Error('Error creando el registro de Pago: '+pagoRes.status);
@@ -783,6 +787,18 @@ function showConfirmation(items){
   document.getElementById('tItems').innerHTML = items.map(it=>`
     <div class="ti"><span>${it.nombre}${it.ref?' · '+it.ref:''}</span><span>${formatMoney(it.valor)}</span></div>
   `).join('');
+
+  const totalSeleccionado = items.reduce((s,it)=>s+it.valor,0);
+  const ajuste = Math.round((extracted.valor - totalSeleccionado) * 100) / 100;
+  const ajusteEl = document.getElementById('tAjuste');
+  if(ajusteEl){
+    if(Math.abs(ajuste) >= 1){
+      ajusteEl.textContent = `Ajuste por redondeo: ${ajuste > 0 ? '+' : ''}${formatMoney(ajuste)}`;
+      ajusteEl.style.display = 'block';
+    } else {
+      ajusteEl.style.display = 'none';
+    }
+  }
 
   document.getElementById('panel3').style.display='none';
   document.getElementById('panel4').style.display='block';
