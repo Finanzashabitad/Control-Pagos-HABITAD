@@ -468,13 +468,13 @@
 
 <script>
 /* ============ CONFIGURACIÓN AIRTABLE ============ */
-const AIRTABLE_TOKEN = "patvT6QWeoFuQtJln.15ccb4fd507e151148bae17ac0c3c23a65f5bae3c791a6ce7648e79a4d0b0c9e";
+const AIRTABLE_TOKEN = "patOmq9Z6ObFPIWjA.cab1d4f66a155fedc4159a3eaaf88e296d66dc63b5b20c207c630f7770330c86";
 const BASE_ID = "appDNWsdsP2toCQdB";
 const API_URL = `https://api.airtable.com/v0/${BASE_ID}`;
 
 const TABLES = {
   Proveedor: { table: "Facturas", nameField: "Proveedor", refField: "N_Factura", valueField: "Valor_Neto", periodoField: "Periodo" },
-  Nomina:    { table: "Nomina",   nameField: "Empleado_Vinculo", refField: null,  valueField: "Valor_Neto", periodoField: "Periodo" },
+  Nomina:    { table: "Nomina",   nameField: "Nombre_Empleado", refField: null,  valueField: "Valor_Neto", periodoField: "Periodo" },
   Impuesto:  { table: "Impuestos",nameField: "Tipo",       refField: null,        valueField: "Valor",      periodoField: "Periodo" }
 };
 
