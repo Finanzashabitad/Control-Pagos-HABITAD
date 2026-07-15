@@ -233,6 +233,77 @@
   }
   .empty-state{padding:40px 20px;text-align:center;color:var(--gray);font-size:14px;}
 
+  .btn-consulta{
+    background:transparent;
+    border:1px solid var(--gold);
+    color:var(--gold);
+    padding:8px 14px;
+    border-radius:6px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .btn-consulta:hover{background:rgba(200,155,60,0.12);}
+
+  .consulta-tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+  }
+  .consulta-tab{
+    padding:8px 16px;
+    border-radius:6px;
+    border:1px solid var(--gray-light);
+    background:var(--paper);
+    font-size:13px;
+    font-weight:600;
+    color:var(--gray);
+    cursor:pointer;
+  }
+  .consulta-tab.active{
+    background:var(--navy);
+    border-color:var(--navy);
+    color:#fff;
+  }
+  .consulta-group{margin-bottom:22px;}
+  .consulta-group h3{
+    font-family:'Libre Baskerville',serif;
+    font-size:16px;
+    margin:0 0 8px 0;
+    color:var(--navy);
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+  }
+  .consulta-group h3 .subtotal{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    color:var(--gray);
+  }
+  .hist-row{
+    padding:14px 16px;
+    border-bottom:1px solid var(--gray-light);
+    cursor:pointer;
+  }
+  .hist-row:last-child{border-bottom:none;}
+  .hist-row:hover{background:#FBFAF7;}
+  .hist-row .hr-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .hist-row .hr-top .left{display:flex;align-items:center;gap:10px;min-width:0;}
+  .hist-row .hr-top .cat-pill{
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;
+    padding:2px 8px;border-radius:10px;background:var(--green-bg);color:var(--green);white-space:nowrap;
+  }
+  .hist-row .hr-top .fecha{font-size:13px;color:var(--gray);}
+  .hist-row .hr-top .valor{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--navy);white-space:nowrap;}
+  .hist-row .hr-ajuste{font-size:12px;color:var(--gold-dark);margin-top:4px;}
+  .hist-detail{
+    margin-top:10px;padding-top:10px;border-top:1px dashed var(--gray-light);display:none;
+  }
+  .hist-detail.open{display:block;}
+  .hist-detail .di-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;}
+
+
   .totals-bar{
     display:flex;
     justify-content:space-between;
@@ -341,6 +412,7 @@
     <span>Conciliación de Pagos</span>
   </div>
   <div class="sub" id="topbarSub">Fase 1 · Registro de comprobantes</div>
+  <button class="btn-consulta" id="openConsulta">📋 Consultar pagos y pendientes</button>
 </div>
 
 <div class="wrap">
@@ -461,6 +533,22 @@
         <button class="btn btn-primary" id="newPago" style="width:100%;">Registrar otro pago</button>
       </div>
     </div>
+  </div>
+
+  <!-- PANEL CONSULTA -->
+  <div class="card" id="panelConsulta" style="display:none;">
+    <div class="btn-row" style="justify-content:space-between; margin-bottom:14px;">
+      <h2 style="margin:0;">Consultar pagos y pendientes</h2>
+      <button class="btn btn-ghost" id="backFromConsulta">← Volver a registrar pago</button>
+    </div>
+
+    <div class="consulta-tabs">
+      <div class="consulta-tab active" id="ctabPendientes">Pendientes</div>
+      <div class="consulta-tab" id="ctabHistorial">Historial de pagos</div>
+    </div>
+
+    <div id="consultaPendientesView"></div>
+    <div id="consultaHistorialView" style="display:none;"></div>
   </div>
 
   <div id="globalStatus"></div>
@@ -824,6 +912,179 @@ document.getElementById('newPago').addEventListener('click', ()=>{
 });
 
 activateTab(1);
+
+/* ============ PANEL CONSULTA ============ */
+function labelCategoria(cat){
+  return cat === 'Proveedor' ? 'Factura de proveedor' : cat === 'Nomina' ? 'Nómina' : 'Impuestos';
+}
+
+function extractNombre(fields, nameField){
+  let v = fields[nameField];
+  if(Array.isArray(v)) v = v[0];
+  return v || '(sin nombre)';
+}
+
+document.getElementById('openConsulta').addEventListener('click', ()=>{
+  ['panel1','panel2','panel3','panel4'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('panelConsulta').style.display='block';
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active','done'));
+  loadConsultaPendientes();
+});
+
+document.getElementById('backFromConsulta').addEventListener('click', ()=>{
+  document.getElementById('panelConsulta').style.display='none';
+  document.getElementById('panel1').style.display='block';
+  activateTab(1);
+});
+
+document.getElementById('ctabPendientes').addEventListener('click', ()=>{
+  document.getElementById('ctabPendientes').classList.add('active');
+  document.getElementById('ctabHistorial').classList.remove('active');
+  document.getElementById('consultaPendientesView').style.display='block';
+  document.getElementById('consultaHistorialView').style.display='none';
+});
+
+document.getElementById('ctabHistorial').addEventListener('click', ()=>{
+  document.getElementById('ctabHistorial').classList.add('active');
+  document.getElementById('ctabPendientes').classList.remove('active');
+  document.getElementById('consultaHistorialView').style.display='block';
+  document.getElementById('consultaPendientesView').style.display='none';
+  loadConsultaHistorial();
+});
+
+async function loadConsultaPendientes(){
+  const view = document.getElementById('consultaPendientesView');
+  view.innerHTML = '<div class="empty-state">Cargando pendientes desde Airtable...</div>';
+  try{
+    const cats = ['Nomina','Proveedor','Impuesto'];
+    const results = {};
+    for(const cat of cats){
+      const cfg = TABLES[cat];
+      const formula = encodeURIComponent(`{Estado}='Pendiente'`);
+      const res = await fetch(`${API_URL}/${encodeURIComponent(cfg.table)}?filterByFormula=${formula}`, {
+        headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
+      });
+      if(!res.ok) throw new Error(`Airtable respondió ${res.status} (${cfg.table})`);
+      const data = await res.json();
+      results[cat] = data.records.map(r=>({
+        nombre: extractNombre(r.fields, cfg.nameField),
+        ref: cfg.refField ? r.fields[cfg.refField] : null,
+        periodo: r.fields[cfg.periodoField]||'',
+        valor: parseFloat(r.fields[cfg.valueField])||0
+      }));
+    }
+
+    let html = '';
+    for(const cat of cats){
+      const items = results[cat];
+      const subtotal = items.reduce((s,it)=>s+it.valor,0);
+      html += `<div class="consulta-group">
+        <h3><span>${labelCategoria(cat)} <span style="font-weight:400;color:var(--gray);font-size:13px;">(${items.length} pendiente${items.length===1?'':'s'})</span></span><span class="subtotal">${formatMoney(subtotal)}</span></h3>
+        <div class="items-list">
+          ${items.length ? items.map(it=>`
+            <div class="item-row">
+              <div class="info">
+                <div class="main">${it.nombre}${it.ref?' · '+it.ref:''}</div>
+                <div class="sub">${it.periodo||''}</div>
+              </div>
+              <div class="val">${formatMoney(it.valor)}</div>
+            </div>
+          `).join('') : '<div class="empty-state">No hay pendientes en esta categoría 🎉</div>'}
+        </div>
+      </div>`;
+    }
+    view.innerHTML = html;
+  }catch(err){
+    console.error(err);
+    view.innerHTML = `<div class="empty-state">No se pudo conectar con Airtable. Verifica el token y el Base ID en el código.</div>`;
+  }
+}
+
+async function loadConsultaHistorial(){
+  const view = document.getElementById('consultaHistorialView');
+  view.innerHTML = '<div class="empty-state">Cargando historial desde Airtable...</div>';
+  try{
+    const sortParams = `sort[0][field]=Fecha&sort[0][direction]=desc`;
+    const res = await fetch(`${API_URL}/Pagos?${sortParams}&maxRecords=100`, {
+      headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
+    });
+    if(!res.ok) throw new Error(`Airtable respondió ${res.status}`);
+    const data = await res.json();
+
+    if(!data.records.length){
+      view.innerHTML = '<div class="empty-state">Aún no hay pagos registrados.</div>';
+      return;
+    }
+
+    view.innerHTML = `<div class="items-list">${data.records.map(r=>{
+      const f = r.fields;
+      const ajuste = parseFloat(f.Ajuste_Redondeo)||0;
+      return `<div class="hist-row" data-pago-id="${r.id}" data-categoria="${f.Categoria||''}">
+        <div class="hr-top">
+          <div class="left">
+            <span class="cat-pill">${labelCategoria(f.Categoria)}</span>
+            <span class="fecha">${f.Fecha||''}${f.Referencia?' · Ref '+f.Referencia:''}</span>
+          </div>
+          <div class="valor">${formatMoney(f.Valor_Total||0)}</div>
+        </div>
+        ${Math.abs(ajuste)>=1 ? `<div class="hr-ajuste">Ajuste por redondeo: ${ajuste>0?'+':''}${formatMoney(ajuste)}</div>` : ''}
+        <div class="hist-detail" id="detail-${r.id}"><div class="empty-state">Cargando ítems...</div></div>
+      </div>`;
+    }).join('')}</div>`;
+
+    document.querySelectorAll('.hist-row').forEach(row=>{
+      row.addEventListener('click', async ()=>{
+        const detailEl = row.querySelector('.hist-detail');
+        const isOpen = detailEl.classList.contains('open');
+        document.querySelectorAll('.hist-detail.open').forEach(d=>d.classList.remove('open'));
+        if(isOpen) return;
+        detailEl.classList.add('open');
+        if(detailEl.dataset.loaded) return;
+        await loadPagoDetalle(row.dataset.pagoId, row.dataset.categoria, detailEl);
+        detailEl.dataset.loaded = '1';
+      });
+    });
+  }catch(err){
+    console.error(err);
+    view.innerHTML = `<div class="empty-state">No se pudo conectar con Airtable. Verifica el token y el Base ID en el código.</div>`;
+  }
+}
+
+async function loadPagoDetalle(pagoId, categoria, detailEl){
+  try{
+    const formula = encodeURIComponent(`FIND("${pagoId}", ARRAYJOIN({Pagos}))`);
+    const res = await fetch(`${API_URL}/PagoDetalle?filterByFormula=${formula}`, {
+      headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
+    });
+    if(!res.ok) throw new Error(`Airtable respondió ${res.status}`);
+    const data = await res.json();
+    const linkField = LINK_FIELD[categoria];
+    const cfg = TABLES[categoria];
+
+    const rows = await Promise.all(data.records.map(async det=>{
+      const itemId = det.fields[linkField] ? det.fields[linkField][0] : null;
+      const valor = parseFloat(det.fields.Valor_Aplicado)||0;
+      if(!itemId) return { nombre:'(ítem no encontrado)', valor };
+      try{
+        const itemRes = await fetch(`${API_URL}/${encodeURIComponent(cfg.table)}/${itemId}`, {
+          headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
+        });
+        if(!itemRes.ok) return { nombre:'(ítem no encontrado)', valor };
+        const itemData = await itemRes.json();
+        return { nombre: extractNombre(itemData.fields, cfg.nameField), valor };
+      }catch{
+        return { nombre:'(ítem no encontrado)', valor };
+      }
+    }));
+
+    detailEl.innerHTML = rows.length
+      ? rows.map(r=>`<div class="di-row"><span>${r.nombre}</span><span>${formatMoney(r.valor)}</span></div>`).join('')
+      : '<div class="empty-state">Sin ítems asociados.</div>';
+  }catch(err){
+    console.error(err);
+    detailEl.innerHTML = '<div class="empty-state">No se pudo cargar el detalle.</div>';
+  }
+}
 </script>
 
 </body>
