@@ -971,7 +971,7 @@ async function loadConsultaPendientes(){
         ref: cfg.refField ? r.fields[cfg.refField] : null,
         periodo: r.fields[cfg.periodoField]||'',
         valor: parseFloat(r.fields[cfg.valueField])||0
-      }));
+      })).sort((a,b)=> (a.periodo||'').localeCompare(b.periodo||''));
     }
 
     let html = '';
@@ -1004,7 +1004,7 @@ async function loadConsultaHistorial(){
   const view = document.getElementById('consultaHistorialView');
   view.innerHTML = '<div class="empty-state">Cargando historial desde Airtable...</div>';
   try{
-    const sortParams = `sort[0][field]=Fecha&sort[0][direction]=desc`;
+    const sortParams = `sort[0][field]=Fecha&sort[0][direction]=asc`;
     const res = await fetch(`${API_URL}/Pagos?${sortParams}&maxRecords=100`, {
       headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
     });
