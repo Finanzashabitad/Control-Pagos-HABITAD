@@ -545,10 +545,12 @@
     <div class="consulta-tabs">
       <div class="consulta-tab active" id="ctabPendientes">Pendientes</div>
       <div class="consulta-tab" id="ctabHistorial">Historial de pagos</div>
+      <div class="consulta-tab" id="ctabImpuestos">Impuestos</div>
     </div>
 
     <div id="consultaPendientesView"></div>
     <div id="consultaHistorialView" style="display:none;"></div>
+    <div id="consultaImpuestosView" style="display:none;"></div>
   </div>
 
   <div id="globalStatus"></div>
@@ -928,6 +930,7 @@ document.getElementById('openConsulta').addEventListener('click', ()=>{
   ['panel1','panel2','panel3','panel4'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('panelConsulta').style.display='block';
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active','done'));
+  switchConsultaTab('pendientes');
   loadConsultaPendientes();
 });
 
@@ -937,19 +940,27 @@ document.getElementById('backFromConsulta').addEventListener('click', ()=>{
   activateTab(1);
 });
 
+function switchConsultaTab(tab){
+  const tabs = { pendientes:'ctabPendientes', historial:'ctabHistorial', impuestos:'ctabImpuestos' };
+  const views = { pendientes:'consultaPendientesView', historial:'consultaHistorialView', impuestos:'consultaImpuestosView' };
+  Object.keys(tabs).forEach(key=>{
+    document.getElementById(tabs[key]).classList.toggle('active', key===tab);
+    document.getElementById(views[key]).style.display = (key===tab) ? 'block' : 'none';
+  });
+}
+
 document.getElementById('ctabPendientes').addEventListener('click', ()=>{
-  document.getElementById('ctabPendientes').classList.add('active');
-  document.getElementById('ctabHistorial').classList.remove('active');
-  document.getElementById('consultaPendientesView').style.display='block';
-  document.getElementById('consultaHistorialView').style.display='none';
+  switchConsultaTab('pendientes');
 });
 
 document.getElementById('ctabHistorial').addEventListener('click', ()=>{
-  document.getElementById('ctabHistorial').classList.add('active');
-  document.getElementById('ctabPendientes').classList.remove('active');
-  document.getElementById('consultaHistorialView').style.display='block';
-  document.getElementById('consultaPendientesView').style.display='none';
+  switchConsultaTab('historial');
   loadConsultaHistorial();
+});
+
+document.getElementById('ctabImpuestos').addEventListener('click', ()=>{
+  switchConsultaTab('impuestos');
+  loadConsultaImpuestos();
 });
 
 async function loadConsultaPendientes(){
@@ -1044,6 +1055,96 @@ async function loadConsultaHistorial(){
         detailEl.dataset.loaded = '1';
       });
     });
+  }catch(err){
+    console.error(err);
+    view.innerHTML = `<div class="empty-state">No se pudo conectar con Airtable. Verifica el token y el Base ID en el código.</div>`;
+  }
+}
+
+/* Config extensible: cuando exista el módulo de Ventas, agrega aquí más entradas,
+   por ejemplo { key:'IVA_Generado', label:'IVA generado', table:'Ventas' }.
+   El total mensual y el detalle se arman automáticamente para cada una. */
+const TAX_FIELDS = [
+  { key:'Rte_Fuente', label:'Retención en la fuente', table:'Facturas' },
+  { key:'Rte_ICA',    label:'Retención de ICA',       table:'Facturas' }
+  // futuro: { key:'IVA_Descontable', label:'IVA descontable', table:'Ventas' },
+  // futuro: { key:'IVA_Generado',    label:'IVA generado',    table:'Ventas' },
+];
+
+async function loadConsultaImpuestos(){
+  const view = document.getElementById('consultaImpuestosView');
+  view.innerHTML = '<div class="empty-state">Cargando impuestos y retenciones desde Airtable...</div>';
+  try{
+    // Traemos todas las tablas involucradas una sola vez (pagadas + pendientes, para proyectar lo que se viene)
+    const tablesNeeded = [...new Set(TAX_FIELDS.map(t=>t.table))];
+    const recordsByTable = {};
+    for(const table of tablesNeeded){
+      const res = await fetch(`${API_URL}/${encodeURIComponent(table)}`, {
+        headers:{ "Authorization": `Bearer ${AIRTABLE_TOKEN}` }
+      });
+      if(!res.ok) throw new Error(`Airtable respondió ${res.status} (${table})`);
+      const data = await res.json();
+      recordsByTable[table] = data.records;
+    }
+
+    // Agrupamos por Periodo
+    const porPeriodo = {}; // { '2026-06': { Rte_Fuente: [...], Rte_ICA: [...] } }
+    TAX_FIELDS.forEach(tf=>{
+      (recordsByTable[tf.table]||[]).forEach(r=>{
+        const val = parseFloat(r.fields[tf.key]) || 0;
+        if(!val) return;
+        const periodo = r.fields.Periodo || '(sin período)';
+        if(!porPeriodo[periodo]) porPeriodo[periodo] = {};
+        if(!porPeriodo[periodo][tf.key]) porPeriodo[periodo][tf.key] = [];
+        porPeriodo[periodo][tf.key].push({
+          nombre: r.fields.Proveedor || r.fields.Tercero || '(sin nombre)',
+          ref: r.fields.N_Factura || '',
+          estado: r.fields.Estado || '',
+          valor: val
+        });
+      });
+    });
+
+    const periodos = Object.keys(porPeriodo).sort();
+    if(!periodos.length){
+      view.innerHTML = '<div class="empty-state">Aún no hay retenciones registradas.</div>';
+      return;
+    }
+
+    let html = '';
+    periodos.forEach(periodo=>{
+      const dataPeriodo = porPeriodo[periodo];
+      const totalPeriodo = TAX_FIELDS.reduce((s,tf)=>s + (dataPeriodo[tf.key]||[]).reduce((s2,it)=>s2+it.valor,0), 0);
+
+      html += `<div class="consulta-group">
+        <h3><span>Período ${periodo}</span><span class="subtotal">${formatMoney(totalPeriodo)}</span></h3>`;
+
+      TAX_FIELDS.forEach(tf=>{
+        const items = dataPeriodo[tf.key] || [];
+        if(!items.length) return;
+        const subtotal = items.reduce((s,it)=>s+it.valor,0);
+        html += `<div style="margin:10px 0 0 0;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--gray);margin-bottom:4px;">
+            <span>${tf.label}</span><span>${formatMoney(subtotal)}</span>
+          </div>
+          <div class="items-list">
+            ${items.map(it=>`
+              <div class="item-row">
+                <div class="info">
+                  <div class="main">${it.nombre}${it.ref?' · '+it.ref:''}</div>
+                  <div class="sub">${it.estado}</div>
+                </div>
+                <div class="val">${formatMoney(it.valor)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+      });
+
+      html += `</div>`;
+    });
+
+    view.innerHTML = html;
   }catch(err){
     console.error(err);
     view.innerHTML = `<div class="empty-state">No se pudo conectar con Airtable. Verifica el token y el Base ID en el código.</div>`;
